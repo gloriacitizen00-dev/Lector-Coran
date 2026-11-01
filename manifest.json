@@ -1,0 +1,12 @@
+{
+  "name": "Lector del Corán",
+  "short_name": "Corán",
+  "description": "Lector digital del Corán en español, con música y lectura sin conexión.",
+  "lang": "es",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff"
+}
