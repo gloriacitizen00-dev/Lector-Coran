@@ -1,4 +1,4 @@
-const CACHE_NAME = "lector-coran-v2";
+const CACHE_NAME = "lector-coran-v3";
 
 const ARCHIVOS = [
   "./",
@@ -6,8 +6,10 @@ const ARCHIVOS = [
   "./manifest.json",
   "./noble-quran_span.pdf",
   "./audio/musica_comprimida.mp3",
-"./pdfjs/pdf.min.js",
-"./pdfjs/pdf.worker.min.js"
+  "./pdfjs/pdf.min.js",
+  "./pdfjs/pdf.worker.min.js",
+  "./icons/icon-192.png",
+  "./icons/icon-512.png"
 ];
 
 self.addEventListener("install", event => {
