@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101713">
+<title>El Sagrado Corán — Lector</title>
+<style>
+:root{color-scheme:dark;--bg:#101713;--panel:#19231d;--gold:#c6a66a;--text:#f2eee4;--muted:#b9b3a5}
+*{box-sizing:border-box}
+html{background:var(--bg);-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 Georgia,serif}
+header{padding:20px 16px;text-align:center;border-bottom:1px solid #394239;background:#141d17}
+h1{margin:0;color:var(--gold);font-size:clamp(1.45rem,5vw,2.2rem)}
+header p{margin:5px 0 0;color:var(--muted);font:14px/1.4 Arial,sans-serif}
+main{width:min(100%,1100px);margin:auto;padding:16px}
+#intro{background:var(--panel);border:1px solid #394239;border-radius:14px;padding:18px;margin-bottom:16px}
+#intro h2{margin-top:0}
+#search{display:block;width:100%;margin:14px 0}
+.controls{display:flex;gap:8px;align-items:stretch;margin:12px 0}
+button,input{font:inherit;border-radius:10px;border:1px solid #596354;padding:12px 14px}
+button{background:#26372b;color:var(--text);cursor:pointer;touch-action:manipulation;min-height:46px}
+button:hover{border-color:var(--gold)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+input{background:#101713;color:var(--text);min-width:0}
+#reader{display:none;background:#202820;border:1px solid #495548;border-radius:14px;padding:12px}
+#reader .controls:first-child{position:sticky;top:0;z-index:2;background:#202820;padding:6px 0}
+#reader .controls button{flex:1}
+#pdfCanvas{display:block;width:100%;height:auto;max-height:none;background:white;margin:0 auto;touch-action:pan-y}
+#pageStatus{text-align:center;color:var(--muted);margin:8px;font:14px Arial,sans-serif}
+#suraList{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
+.sura{display:flex;gap:10px;text-align:left;width:100%;align-items:center;background:var(--panel);min-height:54px}
+.num{color:var(--gold);min-width:32px;font-weight:bold}
+.small{display:block;color:var(--muted);font-size:.82rem}
+#note{color:var(--muted);font:14px/1.5 Arial,sans-serif}
+@media(max-width:600px){
+  header{padding:15px 12px}
+  main{padding:9px}
+  #intro{padding:14px;border-radius:12px}
+  #intro p{font-size:15px}
+  #suraList{grid-template-columns:1fr;gap:7px}
+  .sura{padding:12px;text-align:left}
+  #reader{padding:5px;border-radius:10px}
+  #reader .controls{gap:6px}
+  #reader .controls button{padding:11px 7px;font-size:14px;min-width:0}
+  #pageStatus{font-size:13px}
+  #pdfCanvas{width:100%;height:auto}
+}
+</style>
+<script>
+  window.gtranslateSettings = {
+    "default_language": "es",
+    "languages": ["es", "fr", "it", "ar", "ru", "en", "pt", "de", "zh-CN"],
+    "wrapper_selector": ".gtranslate_wrapper"
+  };
+</script>
+<script src="https://cdn.gtranslate.net/widgets/latest/float.js" defer></script>
+</head>
+<body>
+  <div class="gtranslate_wrapper"></div>
+<header><h1>EL SAGRADO CORÁN</h1><p>Lector digital · Traducción de los significados en español</p></header>
+<main>
+<section id="intro">
+<h2>Índice de las suras</h2>
+<p>Seleccioná una sura para abrir directamente su página inicial en el documento original.</p>
+<input id="search" type="search" placeholder="Buscar una sura…" aria-label="Buscar una sura">
+<div id="suraList"></div>
+<p id="note">Se conservan las páginas originales del PDF. Esta edición contiene una traducción de los significados en español; no es el texto árabe original.</p>
+</section>
+<section id="reader">
+<div class="controls">
+<button id="backIndex">← Índice</button>
+<button id="prev">Anterior</button>
+<button id="next">Siguiente</button>
+</div>
+<div id="pageStatus">Cargando documento…</div>
+<canvas id="pdfCanvas"></canvas>
+<div class="controls">
+<button id="prevBottom">← Anterior</button>
+<button id="nextBottom">Siguiente →</button>
+</div>
+</section>
+<section id="introSection" style="display:none;">
+  <div class="controls">
+    <button onclick="backToIndex()">← Índice</button>
+  </div>
+
+  <h1>Antes de comenzar</h1>
+  <p>Conociendo el Corán y su mensaje</p>
+
+  <div id="introContent"></div>
+</section>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+const suras = [
+{
+  type: 'intro',
+  title: 'Antes de comenzar',
+  subtitle: 'Conociendo el Corán y su mensaje'
+},
+{ number: 1, title: 'Sura Al Fátihah (La Apertura)', printedPage: 29, pdfPage: 30 },
+{ number: 2, title: 'Sura Al Báqarah (La Vaca)', printedPage: 29, pdfPage: 30 },
+{ number: 3, title: 'Sura Al Imrán (La Familia de Imrán)', printedPage: 55, pdfPage: 56 },
+{ number: 4, title: 'Sura An Nisá (Las Mujeres)', printedPage: 69, pdfPage: 70 },
+{ number: 5, title: 'Sura Al Maidah (Las Mesa Servida)', printedPage: 85, pdfPage: 86 },
+{ number: 6, title: 'Sura Al Anaam (Los Ganados)', printedPage: 96, pdfPage: 97 },
+{ number: 7, title: 'Sura Al Aaraf (El Muro Divisorio)', printedPage: 111, pdfPage: 112 },
+{ number: 8, title: 'Sura Al Anfal (Los Botines)', printedPage: 126, pdfPage: 127 },
+{ number: 9, title: 'Sura At Taubah (El arrepentimiento)', printedPage: 133, pdfPage: 134 },
+{ number: 10, title: 'Sura de Yunus (Jonás)', printedPage: 145, pdfPage: 146 },
+{ number: 11, title: 'Sura de Hud', printedPage: 153, pdfPage: 154 },
+{ number: 12, title: 'Sura de Yusuf (José)', printedPage: 162, pdfPage: 163 },
+{ number: 13, title: 'Sura Ar Raad (El Trueno)', printedPage: 170, pdfPage: 171 },
+{ number: 14, title: 'Sura de Ibrahim (Abraham)', printedPage: 174, pdfPage: 175 },
+{ number: 15, title: 'Sura de Al Hiyr', printedPage: 179, pdfPage: 180 },
+{ number: 16, title: 'Sura An Nahl (Las Abejas)', printedPage: 182, pdfPage: 183 },
+{ number: 17, title: 'Sura del Israa (El Viaje Nocturno)', printedPage: 190, pdfPage: 191 },
+{ number: 18, title: 'Sura Al Kahf (La Caverna)', printedPage: 198, pdfPage: 199 },
+{ number: 19, title: 'Sura de Mariam (María)', printedPage: 205, pdfPage: 206 },
+{ number: 20, title: 'Sura de Ta Ha', printedPage: 209, pdfPage: 210 },
+{ number: 21, title: 'Sura Al Anbiá (Los Profetas)', printedPage: 216, pdfPage: 217 },
+{ number: 22, title: 'Sura Al Hayy (La Peregrinación)', printedPage: 222, pdfPage: 223 },
+{ number: 23, title: 'Sura Al Muminín (Los Creyentes)', printedPage: 228, pdfPage: 229 },
+{ number: 24, title: 'Sura An Nur (La Luz)', printedPage: 233, pdfPage: 234 },
+{ number: 25, title: 'Sura Al Furcán (El Criterio)', printedPage: 239, pdfPage: 240 },
+{ number: 26, title: 'Sura Ash Shuará (Los Poetas)', printedPage: 244, pdfPage: 245 },
+{ number: 27, title: 'Sura An Naml (Las Hormigas)', printedPage: 250, pdfPage: 251 },
+{ number: 28, title: 'Sura Al Qasas (El Relato)', printedPage: 256, pdfPage: 257 },
+{ number: 29, title: 'Sura Al Ankabut (La Araña)', printedPage: 262, pdfPage: 263 },
+{ number: 30, title: 'Sura Ar Rum (Los Bizantinos)', printedPage: 267, pdfPage: 268 },
+{ number: 31, title: 'Sura de Luqmán', printedPage: 271, pdfPage: 272 },
+{ number: 32, title: 'Sura As Saydah (La Prosternación)', printedPage: 273, pdfPage: 274 },
+{ number: 33, title: 'Sura Al Ahzab (Los Aliados)', printedPage: 275, pdfPage: 276 },
+{ number: 34, title: 'Sura de Saba', printedPage: 281, pdfPage: 282 },
+{ number: 35, title: 'Sura Fátir (El Originador)', printedPage: 286, pdfPage: 287 },
+{ number: 36, title: 'Sura Ia Sin', printedPage: 289, pdfPage: 290 },
+{ number: 37, title: 'Sura As Saffat (Los Ordenados en Filas)', printedPage: 293, pdfPage: 294 },
+{ number: 38, title: 'Sura de Sad', printedPage: 299, pdfPage: 300 },
+{ number: 39, title: 'Sura Az Zumar (Los Tropeles)', printedPage: 303, pdfPage: 304 },
+{ number: 40, title: 'Sura Gafir (El Remisorio)', printedPage: 310, pdfPage: 311 },
+{ number: 41, title: 'Sura Fusilat (Los Preceptos Detallados)', printedPage: 316, pdfPage: 317 },
+{ number: 42, title: 'Sura Ash Shura (El Consejo)', printedPage: 320, pdfPage: 321 },
+{ number: 43, title: 'Sura Az Zujruf (Los Ornamentos de Oro)', printedPage: 325, pdfPage: 326 },
+{ number: 44, title: 'Sura Ad Duján (El Humo)', printedPage: 330, pdfPage: 331 },
+{ number: 45, title: 'Sura Al Yaziah (La Arrodillada)', printedPage: 332, pdfPage: 333 },
+{ number: 46, title: 'Sura Al Ahqaf (Las Dunas)', printedPage: 334, pdfPage: 335 },
+{ number: 47, title: 'Sura de Muhámmad', printedPage: 337, pdfPage: 338 },
+{ number: 48, title: 'Sura Al Fatj (La Conquista)', printedPage: 340, pdfPage: 341 },
+{ number: 49, title: 'Sura Al Huyurat (Los Aposentos)', printedPage: 343, pdfPage: 344 },
+{ number: 50, title: 'Sura Qaf', printedPage: 345, pdfPage: 346 },
+{ number: 51, title: 'Sura Ad Dariyat (Los vientos)', printedPage: 347, pdfPage: 348 },
+{ number: 52, title: 'Sura At Tur (El Monte)', printedPage: 349, pdfPage: 350 },
+{ number: 53, title: 'Sura An Naim (La Estrella)', printedPage: 351, pdfPage: 352 },
+{ number: 54, title: 'Sura Al Qamar (La Luna)', printedPage: 353, pdfPage: 354 },
+{ number: 55, title: 'Sura Ar Rahmán (El Clemente)', printedPage: 355, pdfPage: 356 },
+{ number: 56, title: 'Sura Al Waquiah (El Suceso)', printedPage: 357, pdfPage: 358 },
+{ number: 57, title: 'Sura Al Hadid (El Hierro)', printedPage: 359, pdfPage: 360 },
+{ number: 58, title: 'Sura Al Muyadalah (La Discusión)', printedPage: 362, pdfPage: 363 },
+{ number: 59, title: 'Sura Al Hashr (El Destierro)', printedPage: 364, pdfPage: 365 },
+{ number: 60, title: 'Sura Al Mumtahanah (La Examinada)', printedPage: 366, pdfPage: 367 },
+{ number: 61, title: 'Sura As Saff (La Fila)', printedPage: 368, pdfPage: 369 },
+{ number: 62, title: 'Sura Al Yumuá (El Viernes)', printedPage: 369, pdfPage: 370 },
+{ number: 63, title: 'Sura Al Munafiqún (Los Hipócritas)', printedPage: 370, pdfPage: 371 },
+{ number: 64, title: 'Sura At Tagabun (El Desengaño)', printedPage: 371, pdfPage: 372 },
+{ number: 65, title: 'Sura At Talaq (El Divorcio)', printedPage: 372, pdfPage: 373 },
+{ number: 66, title: 'Sura At Tahrim (La Prohibición)', printedPage: 374, pdfPage: 375 },
+{ number: 67, title: 'Sura Al Mulk (El Reino)', printedPage: 375, pdfPage: 376 },
+{ number: 68, title: 'Sura Al Qálam (El Cálamo)', printedPage: 377, pdfPage: 378 },
+{ number: 69, title: 'Sura Al Haqah (La Verdad Inevitable)', printedPage: 379, pdfPage: 380 },
+{ number: 70, title: 'Sura Al Maariy (Las Vías de Ascensión)', printedPage: 380, pdfPage: 381 },
+{ number: 71, title: 'Sura de Nuh (Noé)', printedPage: 381, pdfPage: 382 },
+{ number: 72, title: 'Sura Al Yin (Los Genios)', printedPage: 383, pdfPage: 384 },
+{ number: 73, title: 'Sura Al Múzammil (El Cobijado)', printedPage: 384, pdfPage: 385 },
+{ number: 74, title: 'Sura Al Mudázzir (El Envuelto en el Manto)', printedPage: 385, pdfPage: 386 },
+{ number: 75, title: 'Sura Al Quiamah (La Resurrección)', printedPage: 387, pdfPage: 388 },
+{ number: 76, title: 'Sura Al Insán (El Hombre)', printedPage: 388, pdfPage: 389 },
+{ number: 77, title: 'Sura Al Mursalat (Los Ángeles Enviados)', printedPage: 389, pdfPage: 390 },
+{ number: 78, title: 'Sura An Nabá (La Noticia)', printedPage: 391, pdfPage: 392 },
+{ number: 79, title: 'Sura An Naziát (Los Ángeles Arrancadores)', printedPage: 392, pdfPage: 393 },
+{ number: 80, title: 'Sura Abasá (El Ceño)', printedPage: 393, pdfPage: 394 },
+{ number: 81, title: 'Sura At Takuir (El Arrollamiento)', printedPage: 394, pdfPage: 395 },
+{ number: 82, title: 'Sura Al Infitar (La Hendidura)', printedPage: 395, pdfPage: 396 },
+{ number: 83, title: 'Sura Al Mutáfifin (Los Defraudadores)', printedPage: 396, pdfPage: 397 },
+{ number: 84, title: 'Sura Al Inshiqaq (La Rasgadura)', printedPage: 397, pdfPage: 398 },
+{ number: 85, title: 'Sura Al Buruy (Las Constelaciones)', printedPage: 397, pdfPage: 398 },
+{ number: 86, title: 'Sura At Táriq (Los Astros Nocturnos)', printedPage: 398, pdfPage: 399 },
+{ number: 87, title: 'Sura Al Aala (El Altísimo)', printedPage: 399, pdfPage: 400 },
+{ number: 88, title: 'Sura Al Gáshiah (El Día Angustiante)', printedPage: 399, pdfPage: 400 },
+{ number: 89, title: 'Sura Al Fayir (El Alba)', printedPage: 400, pdfPage: 401 },
+{ number: 90, title: 'Sura Al Balad (La Ciudad)', printedPage: 401, pdfPage: 402 },
+{ number: 91, title: 'Sura Ash Shams (El Sol)', printedPage: 401, pdfPage: 402 },
+{ number: 92, title: 'Sura Al Lail (La Noche)', printedPage: 402, pdfPage: 403 },
+{ number: 93, title: 'Sura Ad Duha (La Luz de la Mañana)', printedPage: 403, pdfPage: 404 },
+{ number: 94, title: 'Sura Ash Sharh (La Apertura del Pecho)', printedPage: 403, pdfPage: 404 },
+{ number: 95, title: 'Sura At Tin (La Higuera)', printedPage: 404, pdfPage: 405 },
+{ number: 96, title: 'Sura Al Alaq (El Cigoto)', printedPage: 404, pdfPage: 405 },
+{ number: 97, title: 'Sura Al Qadr (La Noche Apreciada)', printedPage: 405, pdfPage: 406 },
+{ number: 98, title: 'Sura Al Baienah (La Evidencia)', printedPage: 405, pdfPage: 406 },
+{ number: 99, title: 'Sura Az Zalzalah (El Gran Terremoto)', printedPage: 406, pdfPage: 407 },
+{ number: 100, title: 'Sura Al Adiat (Los Corceles que Galopan)', printedPage: 406, pdfPage: 407 },
+{ number: 101, title: 'Sura Al Qariah (El Día Aterrador)', printedPage: 407, pdfPage: 408 },
+{ number: 102, title: 'Sura At Takazur (La Codicia)', printedPage: 407, pdfPage: 408 },
+{ number: 103, title: 'Sura Al Aser (El Tiempo de la Tarde)', printedPage: 407, pdfPage: 408 },
+{ number: 104, title: 'Sura Al Humazah (Los que se Burlan del Prójimo) 408', printedPage: 408, pdfPage: 409 },
+{ number: 105, title: 'Sura Al Fil (El Elefante)', printedPage: 408, pdfPage: 409 },
+{ number: 106, title: 'Sura de Quraish', printedPage: 408, pdfPage: 409 },
+{ number: 107, title: 'Sura Al Maún (La Ayuda Mínima)', printedPage: 409, pdfPage: 410 },
+{ number: 108, title: 'Sura Al Kauzar', printedPage: 409, pdfPage: 410 },
+{ number: 109, title: 'Sura Al Kafirún (Los Incrédulos)', printedPage: 409, pdfPage: 410 },
+{ number: 110, title: 'Sura An Nasr (El Socorro)', printedPage: 410, pdfPage: 411 },
+{ number: 111, title: 'Sura Al Masad (Las Fibras de Palmeras)', printedPage: 410, pdfPage: 411 },
+{ number: 112, title: 'Sura Al Ijlás (El Monoteísmo)', printedPage: 410, pdfPage: 411 },
+{ number: 113, title: 'Sura Al Falaq (El Rayar del Alba)', printedPage: 411, pdfPage: 412 },
+{ number: 114, title: 'Sura An Nas (Los Hombres)', printedPage: 411, pdfPage: 412 }
+];
+const pdfUrl = "noble-quran_span.pdf";
+let pdfDoc = null;
+let currentPage = 1;
+const canvas = document.getElementById("pdfCanvas");
+const ctx = canvas.getContext("2d");
+
+function renderIndex(filter = "") {
+  const list = document.getElementById("suraList");
+  list.innerHTML = "";
+
+  suras
+    .filter(s => {
+      const text = (s.title + " " + (s.number || "")).toLowerCase();
+      return text.includes(filter.toLowerCase());
+    })
+    .forEach(s => {
+      const b = document.createElement("button");
+      b.className = "sura";
+
+      if (s.type === "intro") {
+        b.innerHTML = `
+          <span class="num">✦</span>
+          <span>
+            ${s.title}
+            <span class="small">${s.subtitle}</span>
+          </span>
+        `;
+
+        b.addEventListener("click", () => openIntro());
+      } else {
+        b.innerHTML = `
+          <span class="num">${s.number}</span>
+          <span>
+            ${s.title}
+            <span class="small">Página impresa ${s.printedPage}</span>
+          </span>
+        `;
+
+        b.addEventListener("click", () => openPage(s.pdfPage));
+      }
+
+      list.appendChild(b);
+    });
+}
+document.getElementById("search").addEventListener("input", e => renderIndex(e.target.value));
+
+async function renderPage(pageNum) {
+  if (!pdfDoc) return;
+  currentPage = Math.max(1, Math.min(pdfDoc.numPages, pageNum));
+  const page = await pdfDoc.getPage(currentPage);
+  const viewport = page.getViewport({scale: 1});
+  const maxWidth = Math.min(document.querySelector("main").clientWidth - 28, 1000);
+  const scale = Math.min(maxWidth / viewport.width, 2);
+  const scaled = page.getViewport({scale});
+  canvas.width = Math.floor(scaled.width);
+  canvas.height = Math.floor(scaled.height);
+  await page.render({canvasContext: ctx, viewport: scaled}).promise;
+  document.getElementById("pageStatus").textContent =
+    `Página ${currentPage} de ${pdfDoc.numPages}`;
+}
+async function openPage(pageNum) {
+  document.getElementById("intro").style.display = "none";
+  document.getElementById("reader").style.display = "block";
+  await renderPage(pageNum);
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+function openIntro() {
+  document.getElementById("intro").style.display = "none";
+  document.getElementById("reader").style.display = "none";
+  document.getElementById("introSection").style.display = "block";
+
+  const content = document.getElementById("introContent");
+
+  content.innerHTML = `
+    <article class="intro-topic">
+      <h2>1. ¿Qué es el Corán?</h2>
+      <p>El Corán es el libro sagrado del islam. Según las creencias islámicas, es la palabra de Allah (Dios), revelada a su mensajero Mohammad por medio del ángel Gabriel.</p>
+      <p>La revelación fue transmitida a Mohammad y posteriormente comunicada a sus compañeros, quienes la aprendieron mediante la memorización y la recitación. También fue conservada por escrito y transmitida a través de generaciones.</p>
+      <p>El Corán es conocido por diferentes nombres:</p>
+      <ul>
+        <li><strong>El Libro:</strong> por ser la escritura sagrada del islam.</li>
+        <li><strong>El Libro de Allah:</strong> porque, según la creencia musulmana, sus palabras proceden de Dios.</li>
+        <li><strong>El Criterio:</strong> por su función de distinguir entre la verdad y la falsedad.</li>
+        <li><strong>La Luz:</strong> por la orientación espiritual que ofrece.</li>
+      </ul>
+      <h3>El Corán y sus traducciones</h3>
+      <p>El documento que acompaña este proyecto contiene una traducción de los significados del Corán al español, no el texto original en árabe.</p>
+      <p>Esta distinción es importante porque, según la introducción, el Corán fue revelado en lengua árabe. Una traducción permite acercarse a sus enseñanzas, pero no reproduce completamente todos los matices del idioma original.</p>
+    </article>
+
+    <article class="intro-topic">
+      <h2>2. El origen del Corán</h2>
+      <p>La introducción sostiene que el origen del Corán es divino: no lo presenta como una obra escrita por Mohammad ni como una creación humana.</p>
+      <p>Desde esta perspectiva, Mohammad fue el mensajero que recibió y transmitió la revelación. El documento menciona varios argumentos para explicar por qué considera que no fue el autor del libro.</p>
+      <p>Entre ellos menciona su reputación de honestidad, el hecho de que era conocido por no saber leer ni escribir y los pasajes del propio Corán en los que se le reprende por determinadas acciones.</p>
+      <p>La introducción también señala que el Corán no funciona como una biografía de Mohammad. Destaca que Jesús y María aparecen mencionados con mayor frecuencia y detalle que el propio mensajero, y que existe una sura dedicada a María.</p>
+      <p>Estos son los argumentos que presenta el documento para defender el origen divino del Corán; se exponen desde su perspectiva religiosa.</p>
+    </article>
+
+    <article class="intro-topic">
+      <h2>3. ¿Cómo está compuesto el Corán?</h2>
+      <p>El Corán está organizado en <strong>114 capítulos, llamados suras</strong>, que contienen versículos. La introducción indica que esta edición contabiliza 6236 versículos.</p>
+      <p>Las suras no tienen todas la misma extensión. Algunas contienen cientos de versículos, mientras que otras son muy breves.</p>
+      <ul>
+        <li><strong>Al-Kauzar (108):</strong> contiene tres versículos.</li>
+        <li><strong>Al-Báqarah (2):</strong> contiene 286 versículos.</li>
+      </ul>
+      <p>Cada sura tiene un nombre y ocupa un lugar determinado dentro de la organización del Corán. Su orden no corresponde simplemente a una narración cronológica de los acontecimientos de la revelación.</p>
+    </article>
+
+    <article class="intro-topic">
+      <h2>4. La lengua del Corán</h2>
+      <p>El Corán fue revelado en lengua árabe. La introducción explica la importancia de este idioma dentro de la revelación y por qué el mensaje fue transmitido en la lengua de la comunidad a la que Mohammad pertenecía.</p>
+      <p>El árabe es la lengua del texto original. Por eso, conocerla permite acercarse a sus expresiones y matices. Sin embargo, que el Corán haya sido revelado en árabe no significa que su mensaje esté destinado únicamente a los pueblos árabes.</p>
+      <p>La introducción distingue entre la lengua de la revelación y el alcance de su mensaje: el islam se presenta como una religión dirigida a toda la humanidad.</p>
+      <p>Las traducciones permiten que quienes no conocen el árabe puedan acercarse a sus enseñanzas, aunque el texto original conserva un lugar fundamental dentro de la tradición islámica.</p>
+    </article>
+
+    <article class="intro-topic">
+      <h2>5. El comienzo de la revelación</h2>
+      <p>Según la introducción, la revelación del Corán comenzó en el año 610, cuando Mohammad tenía aproximadamente cuarenta años.</p>
+      <p>El acontecimiento tuvo lugar en La Meca. Mohammad recibió la primera revelación por medio del ángel Gabriel, conocido en la tradición islámica como Yibril.</p>
+      <p>Los primeros versículos revelados corresponden a los cinco versículos iniciales de la sura Al-Alaq. Este episodio marcó el comienzo de un proceso que se extendería durante aproximadamente veintitrés años.</p>
+      <p>La revelación no fue entregada de una sola vez. Los versículos y las suras fueron comunicados gradualmente, a lo largo de diferentes momentos de la vida de Mohammad.</p>
+    </article>
+
+    <article class="intro-topic">
+      <h2>6. ¿Por qué el Corán fue revelado gradualmente?</h2>
+      <p>La introducción explica que la revelación gradual tuvo diferentes propósitos. No se trató solamente de transmitir un texto, sino de acompañar a Mohammad y a la primera comunidad musulmana durante un período de grandes transformaciones.</p>
+      <h3>El apoyo a Mohammad</h3>
+      <p>La revelación servía como consuelo y orientación para Mohammad durante las dificultades que enfrentaba al transmitir el mensaje.</p>
+      <h3>La respuesta a situaciones concretas</h3>
+      <p>A medida que surgían preguntas, conflictos y acontecimientos dentro de la comunidad, se revelaban pasajes relacionados con esas circunstancias. De esta manera, el mensaje podía orientar a los creyentes frente a situaciones que estaban viviendo.</p>
+      <h3>La formación gradual de la comunidad</h3>
+      <p>La introducción relaciona la revelación progresiva con el desarrollo de las normas y prácticas religiosas. Las enseñanzas y disposiciones se comunicaron progresivamente, acompañando la formación de la primera comunidad musulmana.</p>
+      <p>El documento considera que esta forma de revelación permite apreciar la coherencia del Corán, cuyos pasajes fueron transmitidos en circunstancias diferentes y durante un período prolongado.</p>
+    </article>
+
+    <article class="intro-topic">
+      <h2>7. Los temas que aborda el Corán</h2>
+      <p>El Corán no se limita a tratar un solo aspecto de la vida religiosa. La introducción explica que sus enseñanzas abarcan diferentes dimensiones de la existencia humana.</p>
+      <ul>
+        <li><strong>La relación con Allah:</strong> la fe, la adoración y la responsabilidad del ser humano ante Dios.</li>
+        <li><strong>El mundo espiritual:</strong> los ángeles, los demonios y otras realidades de las creencias islámicas.</li>
+        <li><strong>Las generaciones anteriores:</strong> relatos sobre pueblos y comunidades que existieron antes de la llegada del islam.</li>
+        <li><strong>Las prácticas religiosas:</strong> la oración, la caridad, el ayuno y la peregrinación.</li>
+        <li><strong>La vida familiar y comunitaria:</strong> las relaciones entre las personas y sus responsabilidades.</li>
+        <li><strong>Las relaciones económicas:</strong> las transacciones y los principios que deben orientar los intercambios.</li>
+        <li><strong>La creación:</strong> referencias a los animales y otras criaturas.</li>
+      </ul>
+      <p>La introducción destaca que algunos temas aparecen en diferentes suras. Esta repetición no se presenta como una simple redundancia: permite recordar enseñanzas importantes, abordarlas desde distintos contextos y reforzar su significado.</p>
+    </article>
+
+    <article class="intro-topic">
+      <h2>8. La escritura y recopilación del Corán</h2>
+      <p>Durante la vida de Mohammad, la preservación del Corán se realizó principalmente mediante la memorización y la recitación. Sus compañeros aprendían los versículos revelados y los transmitían a otras personas.</p>
+      <p>La introducción también explica que algunos compañeros escribían los pasajes revelados. De esta manera, el texto se conservaba tanto en la memoria de quienes lo aprendían como en registros escritos.</p>
+      <h3>La primera recopilación</h3>
+      <p>Después de la muerte de Mohammad, algunos de los compañeros que conocían el Corán de memoria fallecieron. Ante esta situación, surgió la preocupación de reunir los fragmentos escritos y preservar el texto completo.</p>
+      <p>El documento explica que la primera recopilación se realizó durante el califato de Abu Bakr. El manuscrito permaneció primero bajo su custodia, posteriormente pasó a Umar y después quedó bajo el cuidado de su hija Hafsa.</p>
+      <h3>La normalización durante el califato de Uthman</h3>
+      <p>Con la expansión de la comunidad musulmana surgieron diferencias relacionadas con los dialectos y las formas de recitación.</p>
+      <p>La introducción explica que, durante el califato de Uthman, se preparó una versión estandarizada del texto para evitar desacuerdos. A partir de esa recopilación se distribuyeron copias a diferentes regiones.</p>
+      <h3>La preservación mediante la recitación</h3>
+      <p>La conservación del Corán no dependió únicamente de los manuscritos. La memorización y la transmisión oral continuaron siendo fundamentales. En tiempos modernos, las grabaciones de recitaciones también permiten escuchar el texto y facilitan su aprendizaje.</p>
+    </article>
+
+    <article class="intro-topic">
+      <h2>9. Las características extraordinarias del Corán</h2>
+      <p>La introducción presenta varias características que, desde la perspectiva islámica, distinguen al Corán de otros textos.</p>
+      <p>Una de las principales es su preservación. El documento destaca que el texto ha sido transmitido mediante la escritura y la memorización, y que numerosos musulmanes de distintas generaciones han aprendido sus versículos completos.</p>
+      <h3>El desafío literario</h3>
+      <p>La introducción explica que el Corán plantea un desafío a quienes dudan de su origen divino: producir un texto comparable a él. Desde la creencia musulmana, este desafío constituye uno de los argumentos relacionados con su carácter milagroso.</p>
+      <h3>Sus enseñanzas y su contenido</h3>
+      <p>El documento también señala como características extraordinarias la amplitud de sus enseñanzas, sus relatos sobre pueblos y acontecimientos del pasado, sus referencias a acontecimientos futuros y las imágenes que utiliza para transmitir sus mensajes.</p>
+      <p>También presenta determinadas referencias como señales de conocimiento científico extraordinario. Estas afirmaciones corresponden a la interpretación religiosa de la obra y no deben confundirse con demostraciones científicas independientes.</p>
+    </article>
+
+    <article class="intro-topic">
+      <h2>10. Otros atributos del Corán</h2>
+      <p>Además de su preservación y sus características literarias, la introducción enumera otras cualidades que la tradición islámica atribuye al Corán.</p>
+      <p>Entre ellas se encuentra la recompensa espiritual asociada con su recitación. El documento explica que los musulmanes consideran valioso leerlo, aprenderlo y transmitir sus enseñanzas.</p>
+      <p>También menciona la intercesión del Corán en el Día del Juicio, una creencia relacionada con la recompensa espiritual de quienes mantuvieron una relación constante con sus enseñanzas.</p>
+      <p>La introducción lo describe, además, como una fuente de orientación para el corazón y el comportamiento humano. Desde esta perspectiva, su lectura no consiste solamente en pronunciar palabras, sino también en comprenderlas y procurar aplicar sus enseñanzas.</p>
+      <p>Otro aspecto destacado es su facilidad para ser memorizado y recitado, característica que el documento relaciona con su transmisión a través de distintas generaciones.</p>
+    </article>
+
+    <article class="intro-topic">
+      <h2>11. El islam: una religión y una forma de vida</h2>
+      <p>La palabra <em>islam</em> se relaciona en la introducción con la idea de someterse a Allah. Ser musulmán significa reconocer a Dios como único y orientar la propia vida de acuerdo con sus enseñanzas.</p>
+      <p>El islam no se presenta únicamente como un conjunto de prácticas religiosas. La introducción lo describe también como una forma de vida que comprende la relación con Dios, el comportamiento personal y las responsabilidades hacia otras personas.</p>
+      <h3>Los pilares de la fe</h3>
+      <ol>
+        <li>La creencia en Allah.</li>
+        <li>La creencia en los libros revelados.</li>
+        <li>La creencia en los mensajeros de Dios.</li>
+        <li>La creencia en el Día del Juicio.</li>
+        <li>La creencia en el Qadar o decreto divino.</li>
+        <li>La creencia en la vida después de la muerte.</li>
+      </ol>
+      <h3>Los pilares de la práctica</h3>
+      <ol>
+        <li><strong>La Shahada:</strong> el testimonio de fe.</li>
+        <li><strong>La oración:</strong> las cinco oraciones diarias.</li>
+        <li><strong>El Zakat:</strong> la contribución destinada a quienes necesitan ayuda.</li>
+        <li><strong>El ayuno:</strong> especialmente durante el mes de Ramadán.</li>
+        <li><strong>El Hajj:</strong> la peregrinación a La Meca para quienes tienen la posibilidad de realizarla.</li>
+      </ol>
+    </article>
+
+    <article class="intro-topic">
+      <h2>12. Allah: el Dios único</h2>
+      <p>La introducción presenta la creencia en Allah como el fundamento central del islam. Según esta enseñanza, Dios es único, no tiene asociados ni comparte su divinidad con ninguna otra entidad.</p>
+      <p>Allah es descrito como el creador y soberano de todo cuanto existe. La introducción también menciona atributos como su conocimiento absoluto, su capacidad de escuchar, su misericordia, su justicia y su sabiduría.</p>
+      <p>Esta concepción establece una diferencia fundamental entre Dios y su creación: ninguna persona, criatura o ser puede compararse con Él ni ocupar su lugar.</p>
+      <h3>La sura Al-Ijlas y la unicidad de Dios</h3>
+      <blockquote>
+        <p>Di: Él es Allah, Uno.</p>
+        <p>Allah, el Absoluto.</p>
+        <p>No engendró ni fue engendrado.</p>
+        <p>Y no hay nada ni nadie que sea semejante a Él.</p>
+      </blockquote>
+      <p>Este pasaje expresa la idea de la unicidad divina: Dios no tiene descendencia, no procede de otro ser y no existe nada comparable a Él.</p>
+    </article>
+
+    <article class="intro-topic">
+      <h2>13. El Corán como guía para la vida</h2>
+      <p>La introducción explica que el Corán constituye la fuente principal de orientación para la fe y la práctica de los musulmanes.</p>
+      <p>Su función no se limita a establecer creencias religiosas. También ofrece enseñanzas relacionadas con el comportamiento, las relaciones humanas y la organización de la sociedad.</p>
+      <ul>
+        <li>La conducta individual y la responsabilidad personal.</li>
+        <li>Las relaciones familiares y comunitarias.</li>
+        <li>La justicia en el trato hacia otras personas.</li>
+        <li>Las actividades económicas y las transacciones.</li>
+        <li>La relación entre las personas y Dios.</li>
+      </ul>
+      <p>Desde esta perspectiva, el Corán proporciona principios para orientar tanto la vida espiritual como la convivencia social.</p>
+    </article>
+
+    <article class="intro-topic">
+      <h2>14. Mohammad, el mensajero del islam</h2>
+      <p>La introducción presenta a Mohammad como el último mensajero de Dios dentro de la tradición islámica.</p>
+      <p>Según los datos biográficos que ofrece el documento, nació en La Meca en el año 570. Antes de recibir la revelación, era conocido por su honestidad y confiabilidad.</p>
+      <p>A los cuarenta años comenzó a recibir la revelación por medio del ángel Gabriel. Este acontecimiento marcó el inicio de su misión como mensajero.</p>
+      <p>La revelación continuó durante aproximadamente veintitrés años, hasta poco antes de su muerte, que ocurrió cuando tenía sesenta y tres años.</p>
+      <p>El documento también señala que, antes de su fallecimiento, gran parte de la península arábiga había aceptado el islam.</p>
+      <p>En la tradición musulmana, Mohammad ocupa un lugar fundamental como transmisor de la revelación y ejemplo de conducta para los creyentes. Sin embargo, la adoración se dirige exclusivamente a Allah.</p>
+    </article>
+
+    <article class="intro-topic">
+      <h2>15. Jesús en el islam</h2>
+      <p>La introducción dedica un apartado a Jesús porque ocupa un lugar importante dentro de las creencias islámicas.</p>
+      <p>El islam reconoce a Jesús como un gran mensajero de Dios. El documento menciona su nacimiento virginal y los milagros que realizó con el permiso divino.</p>
+      <p>La interpretación islámica presentada en el texto difiere de la doctrina cristiana sobre algunos acontecimientos de su vida. Según esta perspectiva, Jesús no fue crucificado, sino que Dios lo salvó y lo elevó hacia Él.</p>
+      <p>La introducción también establece una conexión entre Jesús y Mohammad: ambos son presentados como mensajeros que transmitieron el mensaje de adorar a un solo Dios.</p>
+      <p>Dentro del islam, Jesús es una figura religiosa reverenciada, aunque su naturaleza y su papel se interpretan de manera diferente a como lo hacen las principales doctrinas cristianas.</p>
+    </article>
+
+    <article class="intro-topic">
+      <h2>16. El islam, la misericordia y el terrorismo</h2>
+      <p>La introducción aborda directamente la relación entre el islam y el terrorismo. Su propósito es rechazar la idea de que la violencia terrorista represente las enseñanzas fundamentales de esta religión.</p>
+      <p>El documento presenta el islam como una religión de misericordia y sostiene que no permite atacar injustamente a personas que no están combatiendo contra los musulmanes.</p>
+      <p>Para desarrollar este argumento, cita el versículo 8 de la sura Al-Mumtahana, que habla de actuar con bondad y justicia hacia quienes no han combatido a los musulmanes ni los han expulsado de sus hogares.</p>
+      <p>La introducción también condena el asesinato y los actos de crueldad, incluso contra los animales. De esta manera, establece una distinción entre las enseñanzas religiosas que presenta y las acciones de grupos o individuos que recurren al terrorismo.</p>
+    </article>
+
+    <article class="intro-topic">
+      <h2>17. Las mujeres en el islam</h2>
+      <p>La introducción dedica una sección a describir los derechos y las responsabilidades de las mujeres dentro de las enseñanzas islámicas.</p>
+      <p>Entre los aspectos que destaca se encuentran los derechos económicos y patrimoniales. Según el documento, una mujer puede poseer bienes, administrar sus ingresos, comprar y vender, realizar donaciones y disponer de sus propiedades.</p>
+      <p>También explica que la dote matrimonial pertenece a la mujer y que puede utilizarla según su voluntad. Asimismo, señala que conserva su apellido y no está obligada a adoptar el de su esposo.</p>
+      <h3>El trato hacia las esposas y las madres</h3>
+      <p>La introducción insiste en la importancia de tratar bien a las mujeres, especialmente dentro de la familia.</p>
+      <p>Menciona enseñanzas atribuidas a Mohammad que destacan el buen comportamiento hacia las esposas y reconocen la importancia de las madres. El documento utiliza estas referencias para presentar el respeto, la consideración y el buen trato como responsabilidades religiosas.</p>
+    </article>
+
+    <article class="intro-topic">
+      <h2>18. ¿Cómo convertirse al islam?</h2>
+      <p>La introducción finaliza explicando la declaración de fe mediante la cual una persona expresa su aceptación del islam.</p>
+      <p>Esta declaración se conoce como <strong>Shahada</strong> y se formula de la siguiente manera:</p>
+      <blockquote>
+        <p>La ilaha illa Allah, Muhammadur rasul Allah.</p>
+      </blockquote>
+      <p>Su significado es:</p>
+      <blockquote>
+        <p>No hay divinidad excepto Allah, y Mohammad es el mensajero de Allah.</p>
+      </blockquote>
+      <p>La declaración contiene dos afirmaciones fundamentales: reconocer la unicidad de Dios y aceptar a Mohammad como su mensajero.</p>
+      <p>El documento explica que convertirse al islam implica aceptar estas creencias y reconocer el Corán como la palabra de Dios. También incluye la creencia en el Día del Juicio y la aceptación del islam como religión y forma de vida.</p>
+    </article>
+  `;
+
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+function backToIndex() {
+  document.getElementById("reader").style.display = "none";
+  document.getElementById("introSection").style.display = "none";
+  document.getElementById("intro").style.display = "block";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+document.getElementById("backIndex").onclick = backToIndex;
+document.getElementById("prev").onclick = () => renderPage(currentPage - 1);
+document.getElementById("prevBottom").onclick = () => renderPage(currentPage - 1);
+document.getElementById("next").onclick = () => renderPage(currentPage + 1);
+document.getElementById("nextBottom").onclick = () => renderPage(currentPage + 1);
+
+// En celular: deslizar horizontalmente para cambiar de página.
+let touchStartX = 0;
+let touchStartY = 0;
+canvas.addEventListener("touchstart", event => {
+  if (event.touches.length !== 1) return;
+  touchStartX = event.touches[0].clientX;
+  touchStartY = event.touches[0].clientY;
+}, {passive:true});
+canvas.addEventListener("touchend", event => {
+  if (!touchStartX && !touchStartY) return;
+  const dx = event.changedTouches[0].clientX - touchStartX;
+  const dy = event.changedTouches[0].clientY - touchStartY;
+  if (Math.abs(dx) > 65 && Math.abs(dx) > Math.abs(dy) * 1.3) {
+    renderPage(currentPage + (dx < 0 ? 1 : -1));
+  }
+  touchStartX = 0;
+  touchStartY = 0;
+}, {passive:true});
+
+renderIndex();
+pdfjsLib.getDocument(pdfUrl).promise.then(pdf => {
+  pdfDoc = pdf;
+}).catch(err => {
+  document.getElementById("pageStatus").textContent =
+    "No se pudo cargar el PDF. Verificá que noble-quran_span.pdf esté junto a index.html.";
+  console.error(err);
+});
+</script>
+<div id="music-player" style="
+  position: fixed;
+  bottom: 18px;
+  right: 18px;
+  z-index: 9999;
+  background: #ffffff;
+  padding: 10px;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+">
+  <audio controls loop preload="none" style="width: 230px;">
+    <source src="audio/musica.mp3" type="audio/mpeg">
+    Tu navegador no puede reproducir este audio.
+  </audio>
+</div>
+</body>
+</html>
