@@ -1,4 +1,4 @@
-const CACHE_NAME = "lector-coran-v6";
+const CACHE_NAME = "lector-coran-v7";
 
 const ARCHIVOS = [
   "./",
