@@ -553,21 +553,33 @@ document.getElementById("nextBottom").onclick = () => renderPage(currentPage + 1
 // En celular: deslizar horizontalmente para cambiar de página.
 let touchStartX = 0;
 let touchStartY = 0;
+
 canvas.addEventListener("touchstart", event => {
-  if (event.touches.length !== 1) return;
+  if (zoomLevel > 1 || event.touches.length !== 1) return;
+
   touchStartX = event.touches[0].clientX;
   touchStartY = event.touches[0].clientY;
-}, {passive:true});
+}, { passive: true });
+
 canvas.addEventListener("touchend", event => {
+  if (zoomLevel > 1) {
+    touchStartX = 0;
+    touchStartY = 0;
+    return;
+  }
+
   if (!touchStartX && !touchStartY) return;
+
   const dx = event.changedTouches[0].clientX - touchStartX;
   const dy = event.changedTouches[0].clientY - touchStartY;
+
   if (Math.abs(dx) > 65 && Math.abs(dx) > Math.abs(dy) * 1.3) {
     renderPage(currentPage + (dx < 0 ? 1 : -1));
   }
+
   touchStartX = 0;
   touchStartY = 0;
-}, {passive:true});
+}, { passive: true });
 
 renderIndex();
 pdfjsLib.getDocument(pdfUrl).promise.then(pdf => {
