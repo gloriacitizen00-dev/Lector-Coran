@@ -26,7 +26,11 @@ input{background:#101713;color:var(--text);min-width:0}
 #reader{display:none;background:#202820;border:1px solid #495548;border-radius:14px;padding:12px}
 #reader .controls:first-child{position:sticky;top:0;z-index:2;background:#202820;padding:6px 0}
 #reader .controls button{flex:1}
-#pdfCanvas{display:block;width:100%;height:auto;max-height:none;background:white;margin:0 auto;touch-action:pan-y}
+#pdfCanvas{display:block;width:auto;height:auto;max-width:none;max-height:none;background:white;margin:0 auto;touch-action:pan-x pan-y}
+#pdfViewport{width:100%;overflow:auto;-webkit-overflow-scrolling:touch;background:#111; border-radius:8px}
+.zoom-controls{display:flex;gap:8px;align-items:center;justify-content:center;margin:8px 0}
+.zoom-controls button{min-width:54px}
+#zoomLevel{min-width:58px;text-align:center;color:var(--gold);font:14px Arial,sans-serif}
 #pageStatus{text-align:center;color:var(--muted);margin:8px;font:14px Arial,sans-serif}
 #suraList{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
 .sura{display:flex;gap:10px;text-align:left;width:100%;align-items:center;background:var(--panel);min-height:54px}
@@ -44,7 +48,8 @@ input{background:#101713;color:var(--text);min-width:0}
   #reader .controls{gap:6px}
   #reader .controls button{padding:11px 7px;font-size:14px;min-width:0}
   #pageStatus{font-size:13px}
-  #pdfCanvas{width:100%;height:auto}
+  #pdfCanvas{width:auto;height:auto;max-width:none}
+  #pdfViewport{max-width:100%;}
 }
 </style>
 <script>
@@ -70,7 +75,13 @@ input{background:#101713;color:var(--text);min-width:0}
 <button id="next">Siguiente</button>
 </div>
 <div id="pageStatus">Cargando documento…</div>
-<canvas id="pdfCanvas"></canvas>
+<div class="zoom-controls" aria-label="Controles de zoom">
+  <button id="zoomOut" type="button" aria-label="Alejar">−</button>
+  <span id="zoomLevel">100%</span>
+  <button id="zoomIn" type="button" aria-label="Ampliar">+</button>
+  <button id="zoomFit" type="button">Ajustar</button>
+</div>
+<div id="pdfViewport"><canvas id="pdfCanvas"></canvas></div>
 <div class="controls">
 <button id="prevBottom">← Anterior</button>
 <button id="nextBottom">Siguiente →</button>
@@ -216,6 +227,7 @@ const suras = [
 const pdfUrl = "noble-quran_span.pdf";
 let pdfDoc = null;
 let currentPage = 1;
+let zoomLevel = 1;
 const canvas = document.getElementById("pdfCanvas");
 const ctx = canvas.getContext("2d");
 
@@ -264,14 +276,20 @@ async function renderPage(pageNum) {
   currentPage = Math.max(1, Math.min(pdfDoc.numPages, pageNum));
   const page = await pdfDoc.getPage(currentPage);
   const viewport = page.getViewport({scale: 1});
-  const maxWidth = Math.min(document.querySelector("main").clientWidth - 28, 1000);
-  const scale = Math.min(maxWidth / viewport.width, 2);
+  const maxWidth = Math.max(240, document.getElementById("pdfViewport").clientWidth - 12);
+  const fitScale = maxWidth / viewport.width;
+  const scale = fitScale * zoomLevel;
   const scaled = page.getViewport({scale});
-  canvas.width = Math.floor(scaled.width);
-  canvas.height = Math.floor(scaled.height);
+  const outputScale = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.floor(scaled.width * outputScale);
+  canvas.height = Math.floor(scaled.height * outputScale);
+  canvas.style.width = `${Math.floor(scaled.width)}px`;
+  canvas.style.height = `${Math.floor(scaled.height)}px`;
+  ctx.setTransform(outputScale, 0, 0, outputScale, 0, 0);
   await page.render({canvasContext: ctx, viewport: scaled}).promise;
   document.getElementById("pageStatus").textContent =
     `Página ${currentPage} de ${pdfDoc.numPages}`;
+  document.getElementById("zoomLevel").textContent = `${Math.round(zoomLevel * 100)}%`;
 }
 async function openPage(pageNum) {
   document.getElementById("intro").style.display = "none";
@@ -514,6 +532,19 @@ function backToIndex() {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 document.getElementById("backIndex").onclick = backToIndex;
+document.getElementById("zoomIn").onclick = () => {
+  zoomLevel = Math.min(zoomLevel + 0.2, 3);
+  renderPage(currentPage);
+};
+document.getElementById("zoomOut").onclick = () => {
+  zoomLevel = Math.max(zoomLevel - 0.2, 0.6);
+  renderPage(currentPage);
+};
+document.getElementById("zoomFit").onclick = () => {
+  zoomLevel = 1;
+  renderPage(currentPage);
+};
+
 document.getElementById("prev").onclick = () => renderPage(currentPage - 1);
 document.getElementById("prevBottom").onclick = () => renderPage(currentPage - 1);
 document.getElementById("next").onclick = () => renderPage(currentPage + 1);
