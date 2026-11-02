@@ -582,7 +582,11 @@ canvas.addEventListener("touchend", event => {
 }, { passive: true });
 
 renderIndex();
-pdfjsLib.getDocument(pdfUrl).promise.then(pdf => {
+pdfjsLib.getDocument({
+  url: pdfUrl,
+  disableRange: true,
+  disableStream: true
+}).promise.then(pdf => {
   pdfDoc = pdf;
 }).catch(err => {
   document.getElementById("pageStatus").textContent =
